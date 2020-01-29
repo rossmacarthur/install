@@ -27,11 +27,15 @@ EOF
 }
 
 ok() {
-    printf '\33[1;32minfo:\33[0m %s\n' "$1"
+    printf '\33[1;32minfo\33[0m: %s\n' "$1"
+}
+
+warn() {
+    printf '\33[1;33mwarning\33[0m: %s\n' "$1"
 }
 
 err() {
-    printf '\33[1;31merror:\33[0m %s\n' "$1" >&2
+    printf '\33[1;31merror\33[0m: %s\n' "$1" >&2
     exit 1
 }
 
@@ -69,23 +73,50 @@ download() {
     fi
 }
 
-get_tag() {
-    local _json
+_LATEST_RELEASE_INFO=""
+
+get_latest_release_info() {
     local _repo=$1
     local _url="https://api.github.com/repos/$_repo/releases/latest"
+    local _json
+
+    if [ -z "$_LATEST_RELEASE_INFO" ]; then
+        _json=$(download "$_url")
+
+        if test $? -ne 0; then
+            err "failed to determine latest release for repository '$_repo'"
+        else
+            _LATEST_RELEASE_INFO="$_json"
+        fi
+    fi
+
+    RETVAL="$_LATEST_RELEASE_INFO"
+}
+
+get_tag() {
+    local _repo=$1
+    local _tag
 
     need_cmd grep
     need_cmd cut
 
-    _json=$(download "$_url")
-
-    if test $? -ne 0; then
-        err "failed to determine latest release for repository '$_repo'"
-    fi
-
-    _tag=$(echo "$_json" | grep "tag_name" | cut -f 4 -d '"')
+    get_latest_release_info "$_repo"
+    _tag=$(echo "$RETVAL" | grep "tag_name" | cut -f 4 -d '"')
 
     RETVAL="$_tag"
+}
+
+get_targets() {
+    local _repo=$1
+    local _targets
+
+    need_cmd grep
+    need_cmd cut
+
+    get_latest_release_info "$_repo"
+    _targets=$(echo "$RETVAL" | grep 'name' | cut -f 4 -d '"')
+
+    RETVAL="$_targets"
 }
 
 get_bitness() {
@@ -127,7 +158,7 @@ get_endianness() {
     fi
 }
 
-get_target() {
+get_this_target() {
     local _ostype _cputype _bitness _target _clibtype
 
     need_cmd uname
@@ -291,6 +322,38 @@ get_target() {
     RETVAL="$_target"
 }
 
+get_target() {
+    local _repo=$1
+    local _this_target
+    local _this_target_musl
+    local _avail_targets
+    local _musl_avail=false
+
+    get_this_target
+    _this_target="$RETVAL"
+    _this_target_musl="${_this_target/gnu/musl}"
+
+    get_targets "$_repo"
+    _avail_targets=($RETVAL)
+
+    for _target in "${_avail_targets[@]}"; do
+        if [[ "$_target" = *"$_this_target"* ]]; then
+            RETVAL="$_this_target"
+            return
+        elif [[ "$_target" = *"$_this_target_musl"* ]]; then
+            _musl_avail=true
+        fi
+    done
+
+    if [ "$_musl_avail" = true ]; then
+        RETVAL="$_this_target_musl"
+        warn "current target is $_this_target but only $_this_target_musl is available"
+        return
+    else
+        err "current target $_this_target is not available for download"
+    fi
+}
+
 main() {
     local _repo _bin _tag _target _dest _url _filename _td
     local _force=false
@@ -363,7 +426,7 @@ main() {
     fi
 
     if [ -z "$_target" ]; then
-        get_target || return 1
+        get_target "$_repo" || return 1
         _target="$RETVAL"
         ok "detected target: $_target"
     fi
