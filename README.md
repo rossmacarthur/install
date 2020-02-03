@@ -11,14 +11,14 @@ To install a crate simply run the following
 
 ```sh
 curl --proto '=https' -fLsS https://rossmacarthur.github.io/install/crate.sh \
-    | sh -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
+    | bash -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
 ```
 
 or
 
 ```sh
 wget --no-verbose --https-only https://rossmacarthur.github.io/install/crate.sh \
-    | sh -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
+    | bash -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
 ```
 
 ## Acknowledgements
