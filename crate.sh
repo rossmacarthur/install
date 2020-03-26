@@ -9,6 +9,8 @@ usage() {
     cat 1>&2 <<EOF
 Install a binary release of a Rust crate hosted on GitHub.
 
+If the GITHUB_TOKEN environment variable is set, it will be used for the API call to GitHub.
+
 USAGE:
     crate.sh [FLAGS] [OPTIONS]
 
@@ -51,7 +53,7 @@ need_cmd() {
 
 # This wraps curl or wget. Try curl first, if not installed, use wget instead.
 download() {
-    local _url=$1
+    local _url=$1; shift
     local _dld
 
     if check_cmd curl; then
@@ -65,9 +67,9 @@ download() {
     if [ "$_url" = --check ]; then
         need_cmd "$_dld"
     elif [ "$_dld" = curl ]; then
-        curl --silent --proto '=https' --show-error --fail --location "$_url"
+        curl --silent --proto '=https' --show-error --fail --location "$@" "$_url"
     elif [ "$_dld" = wget ]; then
-        wget --no-verbose --https-only "$_url"
+        wget --no-verbose --https-only "$@" "$_url"
     else
         err "unknown downloader"  # should not reach here
     fi
@@ -81,7 +83,11 @@ get_latest_release_info() {
     local _json
 
     if [ -z "$_LATEST_RELEASE_INFO" ]; then
-        _json=$(download "$_url")
+        if  [ -z "$GITHUB_TOKEN" ]; then
+            _json=$(download "$_url")
+        else
+            _json=$(download "$_url" --header "Authorization: Bearer $GITHUB_TOKEN")
+        fi
 
         if test $? -ne 0; then
             err "failed to determine latest release for repository '$_repo'"
@@ -334,13 +340,13 @@ get_target() {
     _this_target_musl="${_this_target/gnu/musl}"
 
     get_targets "$_repo"
-    _avail_targets=($RETVAL)
+    read -r -a _avail_targets -d '' <<< "$RETVAL"
 
     for _target in "${_avail_targets[@]}"; do
-        if [[ "$_target" = *"$_this_target"* ]]; then
+        if echo "$_target" | grep "$_this_target"; then
             RETVAL="$_this_target"
             return
-        elif [[ "$_target" = *"$_this_target_musl"* ]]; then
+        elif echo "$_target" | grep "$_this_target_musl"; then
             _musl_avail=true
         fi
     done
