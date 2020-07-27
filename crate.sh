@@ -343,17 +343,16 @@ get_target() {
     read -r -a _avail_targets -d '' <<< "$RETVAL"
 
     for _target in "${_avail_targets[@]}"; do
-        if echo "$_target" | grep "$_this_target"; then
+        if echo "$_target" | grep -q "$_this_target"; then
             RETVAL="$_this_target"
             return
-        elif echo "$_target" | grep "$_this_target_musl"; then
+        elif echo "$_target" | grep -q "$_this_target_musl"; then
             _musl_avail=true
         fi
     done
 
     if [ "$_musl_avail" = true ]; then
         RETVAL="$_this_target_musl"
-        warn "current target is $_this_target but only $_this_target_musl is available"
         return
     else
         err "current target $_this_target is not available for download"
@@ -434,7 +433,7 @@ main() {
     if [ -z "$_target" ]; then
         get_target "$_repo" || return 1
         _target="$RETVAL"
-        ok "detected target: $_target"
+        ok "found valid target: $_target"
     fi
 
     _filename="$_bin-$_tag-$_target.tar.gz"
