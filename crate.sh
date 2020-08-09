@@ -360,7 +360,7 @@ get_target() {
 }
 
 main() {
-    local _repo _bin _tag _target _dest _url _filename _td
+    local _repo _bin _tag _target _dest _url _filename _td _tf
     local _force=false
     local _to
 
@@ -439,18 +439,32 @@ main() {
     _filename="$_bin-$_tag-$_target.tar.gz"
     _url="https://github.com/$_repo/releases/download/$_tag/$_filename"
     _td=$(mktemp -d || mktemp -d -t tmp)
+    trap "rm -rf '$_td'" EXIT
 
     ok "downloading: $_filename"
-    if ! download "$_url" | tar xz -C "$_td" "$_bin"; then
-        err "failed to download $_url"
+    if ! download "$_url" | tar xz -C "$_td"; then
+        err "failed to download and extract $_url"
     fi
+
+    if [ -f "$_td/$_bin" ]; then
+        _tf="$_td/$_bin"
+    else
+        for f in "$_td/$_bin"*"/$_bin"; do
+            _tf="$f"
+        done
+        if [ -z "$_tf" ]; then
+            err "failed to find $_bin binary in artifact"
+        fi
+    fi
+
     if ! mkdir -p "$_to"; then
         err "failed to create $_to"
     fi
-    if ! install -m 755 "$_td/$_bin" "$_dest"; then
-        err "failed to install $_bin in $_dest"
+
+    if ! install -m 755 "$_tf" "$_dest"; then
+        err "failed to install $_bin binary to $_dest"
     fi
-    rm -rf "$_td"
+
     ok "installed: $_dest"
 }
 
