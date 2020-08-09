@@ -54,7 +54,15 @@ need_cmd() {
 # This wraps curl or wget. Try curl first, if not installed, use wget instead.
 download() {
     local _url=$1; shift
+    local _curl_arg
     local _dld
+
+    if [ "$1" = "--progress" ]; then
+        shift
+        _curl_arg="--progress-bar"
+    else
+        _curl_arg="--silent"
+    fi
 
     if check_cmd curl; then
         _dld=curl
@@ -67,7 +75,7 @@ download() {
     if [ "$_url" = --check ]; then
         need_cmd "$_dld"
     elif [ "$_dld" = curl ]; then
-        curl --silent --proto '=https' --show-error --fail --location "$@" "$_url"
+        curl $_curl_arg --proto '=https' --show-error --fail --location "$@" "$_url"
     elif [ "$_dld" = wget ]; then
         wget --no-verbose --https-only "$@" "$_url"
     else
@@ -442,7 +450,7 @@ main() {
     trap "rm -rf '$_td'" EXIT
 
     ok "downloading: $_filename"
-    if ! download "$_url" | tar xz -C "$_td"; then
+    if ! download "$_url" --progress | tar xz -C "$_td"; then
         err "failed to download and extract $_url"
     fi
 
