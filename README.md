@@ -10,15 +10,31 @@ extracted binary to the specified location.
 To install a crate simply run the following
 
 ```sh
-curl --proto '=https' -fLsS https://rossmacarthur.github.io/install/crate.sh \
+curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
     | bash -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
 ```
 
-or
+## Examples
+
+### [just](https://github.com/casey/just)
 
 ```sh
-wget --no-verbose --https-only https://rossmacarthur.github.io/install/crate.sh \
-    | bash -s -- --repo "<username>/<repository>" --to ~/.cargo/bin
+curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
+    | bash -s -- --repo casey/just --to /usr/local/bin
+```
+
+### [hyperfine](https://github.com/sharkdp/hyperfine)
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
+    | bash -s -- --repo sharkdp/hyperfine --to /usr/local/bin
+```
+
+### [sheldon](https://github.com/rossmacarthur/sheldon)
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
+    | bash -s -- --repo rossmacarthur/sheldon --to /usr/local/bin
 ```
 
 ## Acknowledgements
