@@ -23,6 +23,13 @@ curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/cra
     | bash -s -- --repo rust-embedded/cross --to /usr/local/bin
 ```
 
+#### [hyperfine](https://github.com/sharkdp/hyperfine)
+
+```sh
+curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
+    | bash -s -- --repo sharkdp/hyperfine --to /usr/local/bin
+```
+
 #### [just](https://github.com/casey/just)
 
 ```sh
@@ -30,11 +37,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/cra
     | bash -s -- --repo casey/just --to /usr/local/bin
 ```
 
-#### [hyperfine](https://github.com/sharkdp/hyperfine)
+#### [ripgrep](https://github.com/BurntSushi/ripgrep)
 
 ```sh
 curl --proto '=https' --tlsv1.2 -sSf https://rossmacarthur.github.io/install/crate.sh \
-    | bash -s -- --repo sharkdp/hyperfine --to /usr/local/bin
+    | bash -s -- --repo BurntSushi/ripgrep --bin rg --to /usr/local/bin
 ```
 
 #### [sheldon](https://github.com/rossmacarthur/sheldon)
