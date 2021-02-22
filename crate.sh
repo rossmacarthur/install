@@ -17,15 +17,20 @@ USAGE:
 FLAGS:
     -f, --force    Force overwriting an existing binary
     -h, --help     Show this message and exit.
-    -V, --version  Show the version and exit.
 
 OPTIONS:
-        --repo <SLUG>      Get the repository at "https://github/<SLUG>".
-        --bin <NAME>       The binary to extract from the release tarball. [default: repository name]
-        --tag <TAG>        The release version to install. [default: latest release]
-        --target <TARGET>  Install the release compiled for <TARGET>. [default: current host]
-        --to <LOCATION>    Where to install the binary. [default: current directory]
+    --repo <SLUG>    Get the repository at "https://github/<SLUG>". [required]
+    --to <PATH>      Where to install the binary. [required]
+    --bin <NAME>     The binary to extract from the release tarball. [default: repository name]
+    --tag <TAG>      The release version to install. [default: latest release]
+    --target <ARCH>  Install the release compiled for <ARCH>. [default: current host]
 EOF
+}
+
+usage_err() {
+    usage
+    1>&2 echo
+    err "$@"
 }
 
 ok() {
@@ -404,9 +409,8 @@ get_target() {
 }
 
 main() {
-    local _repo _bin _tag _target _dest _url _filename _td _tf
+    local _repo _name _bin _tag _target _dest _url _filename _td _tf _to
     local _force=false
-    local _to
 
     while test $# -gt 0; do
         case $1 in
@@ -418,24 +422,39 @@ main() {
                 exit 0
                 ;;
             --repo)
-                _repo=$2
                 shift
+                if [ -z "$1" ]; then
+                    usage_err "'--repo' option requires an argument"
+                fi
+                _repo=$1
                 ;;
             --bin)
-                _bin=$2
                 shift
+                if [ -z "$1" ]; then
+                    usage_err "'--bin' option requires an argument"
+                fi
+                _bin=$1
                 ;;
             --tag)
-                _tag=$2
                 shift
+                if [ -z "$1" ]; then
+                    usage_err "'--tag' option requires an argument"
+                fi
+                _tag=$1
                 ;;
             --target)
-                _target=$2
                 shift
+                if [ -z "$1" ]; then
+                    usage_err "'--target' option requires an argument"
+                fi
+                _target=$1
                 ;;
             --to)
-                _to=$2
                 shift
+                if [ -z "$1" ]; then
+                    usage_err "'--to' option requires an argument"
+                fi
+                _to=$1
                 ;;
             *)
                 ;;
@@ -459,13 +478,14 @@ main() {
         err "destination directory must be specified using '--to'"
     fi
 
+    _name="${_repo#*/}"
     if [ -z "$_bin" ]; then
-        _bin="${_repo#*/}"
+        _bin=$_name
     fi
 
     _dest="$_to/$_bin"
     if [ -e "$_dest" ] && [ $_force = false ]; then
-        err "$_dest already exists, use '--force' to replace"
+        err "$_dest already exists, use '-f' or '--force' to replace"
     fi
 
     if [ -z "$_tag" ]; then
@@ -480,7 +500,7 @@ main() {
         ok "found valid target: $_target"
     fi
 
-    _filename="$_bin-$_tag-$_target.tar.gz"
+    _filename="$_name-$_tag-$_target.tar.gz"
     _url="https://github.com/$_repo/releases/download/$_tag/$_filename"
     _td=$(mktemp -d || mktemp -d -t tmp)
     trap "rm -rf '$_td'" EXIT
@@ -493,7 +513,7 @@ main() {
     if [ -f "$_td/$_bin" ]; then
         _tf="$_td/$_bin"
     else
-        for f in "$_td/$_bin"*"/$_bin"; do
+        for f in "$_td/$_name"*"/$_bin"; do
             _tf="$f"
         done
         if [ -z "$_tf" ]; then
