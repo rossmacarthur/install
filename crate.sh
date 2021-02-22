@@ -51,6 +51,10 @@ need_cmd() {
     fi
 }
 
+ensure() {
+    if ! "$@"; then err "command failed: $*"; fi
+}
+
 # This wraps curl or wget. Try curl first, if not installed, use wget instead.
 download() {
     local _url=$1; shift
@@ -172,11 +176,8 @@ get_endianness() {
     fi
 }
 
-get_this_target() {
-    local _ostype _cputype _bitness _target _clibtype
-
-    need_cmd uname
-
+get_architecture() {
+    local _ostype _cputype _bitness _arch _clibtype
     _ostype="$(uname -s)"
     _cputype="$(uname -m)"
     _clibtype="gnu"
@@ -194,6 +195,24 @@ get_this_target() {
         # Darwin `uname -m` lies
         if sysctl hw.optional.x86_64 | grep -q ': 1'; then
             _cputype=x86_64
+        fi
+    fi
+
+    if [ "$_ostype" = SunOS ]; then
+        # Both Solaris and illumos presently announce as "SunOS" in "uname -s"
+        # so use "uname -o" to disambiguate.  We use the full path to the
+        # system uname in case the user has coreutils uname first in PATH,
+        # which has historically sometimes printed the wrong value here.
+        if [ "$(/usr/bin/uname -o)" = illumos ]; then
+            _ostype=illumos
+        fi
+
+        # illumos systems have multi-arch userlands, and "uname -m" reports the
+        # machine hardware name; e.g., "i86pc" on both 32- and 64-bit x86
+        # systems.  Check for the native (widest) instruction set on the
+        # running kernel:
+        if [ "$_cputype" = i86pc ]; then
+            _cputype="$(isainfo -n)"
         fi
     fi
 
@@ -222,6 +241,10 @@ get_this_target() {
 
         Darwin)
             _ostype=apple-darwin
+            ;;
+
+        illumos)
+            _ostype=unknown-illumos
             ;;
 
         MINGW* | MSYS* | CYGWIN*)
@@ -265,7 +288,7 @@ get_this_target() {
             fi
             ;;
 
-        aarch64)
+        aarch64 | arm64)
             _cputype=aarch64
             ;;
 
@@ -300,7 +323,9 @@ get_this_target() {
         s390x)
             _cputype=s390x
             ;;
-
+        riscv64)
+            _cputype=riscv64gc
+            ;;
         *)
             err "unknown CPU type: $_cputype"
 
@@ -318,6 +343,17 @@ get_this_target() {
             powerpc64)
                 _cputype=powerpc
                 ;;
+            aarch64)
+                _cputype=armv7
+                if [ "$_ostype" = "linux-android" ]; then
+                    _ostype=linux-androideabi
+                else
+                    _ostype="${_ostype}eabihf"
+                fi
+                ;;
+            riscv64gc)
+                err "riscv64 with 32-bit userland unsupported"
+                ;;
         esac
     fi
 
@@ -325,15 +361,15 @@ get_this_target() {
     # and fall back to arm.
     # See https://github.com/rust-lang/rustup.rs/issues/587.
     if [ "$_ostype" = "unknown-linux-gnueabihf" ] && [ "$_cputype" = armv7 ]; then
-        if grep '^Features' /proc/cpuinfo | grep -q -v neon; then
+        if ensure grep '^Features' /proc/cpuinfo | grep -q -v neon; then
             # At least one processor does not have NEON.
             _cputype=arm
         fi
     fi
 
-    _target="${_cputype}-${_ostype}"
+    _arch="${_cputype}-${_ostype}"
 
-    RETVAL="$_target"
+    RETVAL="$_arch"
 }
 
 get_target() {
@@ -343,7 +379,7 @@ get_target() {
     local _avail_targets
     local _musl_avail=false
 
-    get_this_target
+    get_architecture
     _this_target="$RETVAL"
     _this_target_musl="${_this_target/gnu/musl}"
 
