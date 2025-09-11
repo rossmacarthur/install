@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu -o pipefail
+
 # This is just a little script that can be downloaded from the internet to
 # install a Rust crate from a GitHub release. It determines the latest release,
 # the current platform (without the need for `rustc`), and installs the
@@ -66,7 +68,7 @@ download() {
     local _curl_arg
     local _dld
 
-    if [ "$1" = "--progress" ]; then
+    if [ "${1-}" = "--progress" ]; then
         shift
         _curl_arg="--progress-bar"
     else
@@ -92,28 +94,33 @@ download() {
     fi
 }
 
-_LATEST_RELEASE_INFO=""
+_RELEASE_INFO=""
 
-get_latest_release_info() {
+get_release_info() {
     local _repo=$1
-    local _url="https://api.github.com/repos/$_repo/releases/latest"
+    local _tag=$2
+    local _url_suffix="latest"
+    if [ "$_tag" != "latest" ]; then
+        _url_suffix="tags/$_tag"
+    fi
+    local _url="https://api.github.com/repos/$_repo/releases/$_url_suffix"
     local _json
 
-    if [ -z "$_LATEST_RELEASE_INFO" ]; then
-        if  [ -z "$GITHUB_TOKEN" ]; then
+    if [ -z "$_RELEASE_INFO" ]; then
+        if  [ -z "${GITHUB_TOKEN+x}" ]; then
             _json=$(download "$_url")
         else
             _json=$(download "$_url" --header "Authorization: Bearer $GITHUB_TOKEN")
         fi
 
         if test $? -ne 0; then
-            err "failed to determine latest release for repository '$_repo'"
+            err "failed to fetch $_tag release for repository '$_repo'"
         else
-            _LATEST_RELEASE_INFO="$_json"
+            _RELEASE_INFO="$_json"
         fi
     fi
 
-    RETVAL="$_LATEST_RELEASE_INFO"
+    RETVAL="$_RELEASE_INFO"
 }
 
 get_tag() {
@@ -123,21 +130,22 @@ get_tag() {
     need_cmd grep
     need_cmd cut
 
-    get_latest_release_info "$_repo"
+    get_release_info "$_repo" "latest"
     _tag=$(echo "$RETVAL" | grep "tag_name" | cut -f 4 -d '"')
 
     RETVAL="$_tag"
 }
 
-get_targets() {
+get_release_assets() {
     local _repo=$1
+    local _tag=$2
     local _targets
 
     need_cmd grep
     need_cmd cut
 
-    get_latest_release_info "$_repo"
-    _targets=$(echo "$RETVAL" | grep 'name' | cut -f 4 -d '"')
+    get_release_info "$_repo" "$_tag"
+    _targets=$(echo "$RETVAL" | grep 'name' | grep '.tar.gz' | cut -f 4 -d '"')
 
     RETVAL="$_targets"
 }
@@ -377,34 +385,31 @@ get_architecture() {
     RETVAL="$_arch"
 }
 
-get_target() {
+get_release_asset() {
     local _repo=$1
-    local _this_target
-    local _this_target_musl
-    local _avail_targets
-    local _musl_avail=false
+    local _tag=$2
+    local _target=$3
+    local _target_musl="${_target/gnu/musl}"
+    local _avail_assets
+    local _musl_avail
 
-    get_architecture
-    _this_target="$RETVAL"
-    _this_target_musl="${_this_target/gnu/musl}"
+    get_release_assets "$_repo" "$_tag"
+    read -r -a _avail_assets -d '' <<< "$RETVAL"
 
-    get_targets "$_repo"
-    read -r -a _avail_targets -d '' <<< "$RETVAL"
-
-    for _target in "${_avail_targets[@]}"; do
-        if echo "$_target" | grep -q "$_this_target"; then
-            RETVAL="$_this_target"
+    for _asset in "${_avail_assets[@]}"; do
+        if echo "$_asset" | grep -q "$_target"; then
+            RETVAL="$_asset"
             return
-        elif echo "$_target" | grep -q "$_this_target_musl"; then
-            _musl_avail=true
+        elif echo "$_asset" | grep -q "$_target_musl"; then
+            _musl_avail="$_asset"
         fi
     done
 
-    if [ "$_musl_avail" = true ]; then
-        RETVAL="$_this_target_musl"
+    if [ -n "$_musl_avail" ]; then
+        RETVAL="$_musl_avail"
         return
     else
-        err "current target $_this_target is not available for download"
+        err "target $_target is not available for download"
     fi
 }
 
@@ -495,12 +500,14 @@ main() {
     fi
 
     if [ -z "$_target" ]; then
-        get_target "$_repo" || return 1
+        get_architecture
         _target="$RETVAL"
-        ok "found valid target: $_target"
+        ok "detected target: $_target"
     fi
 
-    _filename="$_name-$_tag-$_target.tar.gz"
+    get_release_asset "$_repo" "$_tag" "$_target"
+    ok "found valid release asset: $RETVAL"
+    _filename="$RETVAL"
     _url="https://github.com/$_repo/releases/download/$_tag/$_filename"
     _td=$(mktemp -d || mktemp -d -t tmp)
     trap "rm -rf '$_td'" EXIT
