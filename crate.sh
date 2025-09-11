@@ -107,7 +107,7 @@ get_release_info() {
     local _json
 
     if [ -z "$_RELEASE_INFO" ]; then
-        if  [ -z "${GITHUB_TOKEN+x}" ]; then
+        if  [ -z "${GITHUB_TOKEN:-}" ]; then
             _json=$(download "$_url")
         else
             _json=$(download "$_url" --header "Authorization: Bearer $GITHUB_TOKEN")
@@ -498,35 +498,35 @@ main() {
                 ;;
             --repo)
                 shift
-                if [ -z "$1" ]; then
+                if [ -z "${1:-}" ]; then
                     usage_err "'--repo' option requires an argument"
                 fi
                 _repo=$1
                 ;;
             --bin)
                 shift
-                if [ -z "$1" ]; then
+                if [ -z "${1:-}" ]; then
                     usage_err "'--bin' option requires an argument"
                 fi
                 _bin=$1
                 ;;
             --tag)
                 shift
-                if [ -z "$1" ]; then
+                if [ -z "${1:-}" ]; then
                     usage_err "'--tag' option requires an argument"
                 fi
                 _tag=$1
                 ;;
             --target)
                 shift
-                if [ -z "$1" ]; then
+                if [ -z "${1:-}" ]; then
                     usage_err "'--target' option requires an argument"
                 fi
                 _target=$1
                 ;;
             --to)
                 shift
-                if [ -z "$1" ]; then
+                if [ -z "${1:-}" ]; then
                     usage_err "'--to' option requires an argument"
                 fi
                 _to=$1
@@ -545,16 +545,16 @@ main() {
 
     download --check
 
-    if [ -z "$_repo" ]; then
+    if [ -z "${_repo:-}" ]; then
         err "repository must be specified using '--repo'"
     fi
 
-    if [ -z "$_to" ]; then
+    if [ -z "${_to:-}" ]; then
         err "destination directory must be specified using '--to'"
     fi
 
     _name="${_repo#*/}"
-    if [ -z "$_bin" ]; then
+    if [ -z "${_bin:-}" ]; then
         _bin=$_name
     fi
 
@@ -563,13 +563,13 @@ main() {
         err "$_dest already exists, use '-f' or '--force' to replace"
     fi
 
-    if [ -z "$_tag" ]; then
+    if [ -z "${_tag:-}" ]; then
         get_tag "$_repo" || return 1
         _tag="$RETVAL"
         ok "latest release: $_tag"
     fi
 
-    if [ -z "$_target" ]; then
+    if [ -z "${_target:-}" ]; then
         get_architecture
         _target="$RETVAL"
         ok "detected target: $_target"
