@@ -145,7 +145,7 @@ get_release_assets() {
     need_cmd cut
 
     get_release_info "$_repo" "$_tag"
-    _targets=$(echo "$RETVAL" | grep 'name' | grep '.tar.gz' | cut -f 4 -d '"')
+    _targets=$(echo "$RETVAL" | grep 'name' | grep '.tar.gz"' | cut -f 4 -d '"')
 
     RETVAL="$_targets"
 }
