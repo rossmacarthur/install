@@ -145,7 +145,7 @@ get_release_assets() {
     need_cmd cut
 
     get_release_info "$_repo" "$_tag"
-    _targets=$(echo "$RETVAL" | grep 'name' | grep '.tar.gz"' | cut -f 4 -d '"')
+    _targets=$(echo "$RETVAL" | grep 'name' | grep -E '\.tar\.(gz|xz)"' | cut -f 4 -d '"')
 
     RETVAL="$_targets"
 }
@@ -475,7 +475,7 @@ get_release_asset() {
         fi
     done
 
-    if [ -n "$_musl_avail" ]; then
+    if [ -n "${_musl_avail:-}" ]; then
         RETVAL="$_musl_avail"
         return
     else
@@ -582,8 +582,15 @@ main() {
     _td=$(mktemp -d || mktemp -d -t tmp)
     trap "rm -rf '$_td'" EXIT
 
+    local _tar_args
+    case "$_filename" in
+        *.tar.gz) _tar_args="xz" ;;
+        *.tar.xz) _tar_args="xJ" ;;
+        *) err "unsupported archive format: $_filename" ;;
+    esac
+
     ok "downloading: $_filename"
-    if ! download "$_url" --progress | tar xz -C "$_td"; then
+    if ! download "$_url" --progress | tar $_tar_args -C "$_td"; then
         err "failed to download and extract $_url"
     fi
 
