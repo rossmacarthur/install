@@ -145,7 +145,7 @@ get_release_assets() {
     need_cmd cut
 
     get_release_info "$_repo" "$_tag"
-    _targets=$(echo "$RETVAL" | grep 'name' | grep -E '\.tar\.(gz|xz)"' | cut -f 4 -d '"')
+    _targets=$(echo "$RETVAL" | grep 'name' | grep -E '(\.tgz|\.tar\.gz|\tar\.xz)"' | cut -f 4 -d '"')
 
     RETVAL="$_targets"
 }
@@ -466,7 +466,7 @@ get_release_asset() {
     get_release_assets "$_repo" "$_tag"
     read -r -a _avail_assets -d '' <<< "$RETVAL"
 
-    for _asset in "${_avail_assets[@]}"; do
+    for _asset in "${_avail_assets[@]:-}"; do
         if echo "$_asset" | grep -q "$_target"; then
             RETVAL="$_asset"
             return
@@ -584,6 +584,7 @@ main() {
 
     local _tar_args
     case "$_filename" in
+        *.tgz) _tar_args="xz" ;;
         *.tar.gz) _tar_args="xz" ;;
         *.tar.xz) _tar_args="xJ" ;;
         *) err "unsupported archive format: $_filename" ;;
