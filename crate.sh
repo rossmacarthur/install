@@ -611,11 +611,20 @@ main() {
     _td=$(mktemp -d || mktemp -d -t tmp)
     trap "rm -rf '$_td'" EXIT
 
-    local _tar_args
+    local _tar_args _archive_stem
     case "$_filename" in
-        *.tgz) _tar_args="xz" ;;
-        *.tar.gz) _tar_args="xz" ;;
-        *.tar.xz) _tar_args="xJ" ;;
+        *.tgz)
+            _tar_args="xz"
+            _archive_stem="${_filename%.tgz}"
+            ;;
+        *.tar.gz)
+            _tar_args="xz"
+            _archive_stem="${_filename%.tar.gz}"
+            ;;
+        *.tar.xz)
+            _tar_args="xJ"
+            _archive_stem="${_filename%.tar.xz}"
+            ;;
         *) err "unsupported archive format: $_filename" ;;
     esac
 
@@ -626,11 +635,16 @@ main() {
 
     if [ -f "$_td/$_bin" ]; then
         _tf="$_td/$_bin"
+    elif [ -f "$_td/$_archive_stem" ]; then
+        _tf="$_td/$_archive_stem"
     else
         for f in "$_td/$_name"*"/$_bin"; do
-            _tf="$f"
+            if [ -f "$f" ]; then
+                _tf="$f"
+                break
+            fi
         done
-        if [ -z "$_tf" ]; then
+        if [ -z "${_tf:-}" ]; then
             err "failed to find $_bin binary in artifact"
         fi
     fi
