@@ -62,6 +62,13 @@ ensure() {
     if ! "$@"; then err "command failed: $*"; fi
 }
 
+contains() {
+    local _haystack=$1
+    local _needle=$2
+    need_cmd grep
+    [ -n "$_needle" ] && printf '%s\n' "$_haystack" | grep -F -q -- "$_needle"
+}
+
 # This wraps curl or wget. Try curl first, if not installed, use wget instead.
 download() {
     local _url=$1; shift
@@ -459,25 +466,47 @@ get_release_asset() {
     local _repo=$1
     local _tag=$2
     local _target=$3
-    local _target_musl="${_target/gnu/musl}"
+    local _bin=$4
+    local _name=$5
+    local _target_fallback="${_target/-gnu/-musl}"
     local _avail_assets
-    local _musl_avail
+    local _asset
+    local _best
+    local _best_score=0
+    local _score
 
     get_release_assets "$_repo" "$_tag"
     read -r -a _avail_assets -d '' <<< "$RETVAL"
 
     for _asset in "${_avail_assets[@]:-}"; do
-        if echo "$_asset" | grep -q "$_target"; then
-            RETVAL="$_asset"
-            return
-        elif echo "$_asset" | grep -q "$_target_musl"; then
-            _musl_avail="$_asset"
+        _score=0
+
+        if contains "$_asset" "$_target"; then
+            if contains "$_asset" "$_bin"; then
+                _score=6   # 1. target + bin
+            elif contains "$_asset" "$_name"; then
+                _score=5   # 2. target + name
+            else
+                _score=2   # 5. target
+            fi
+        elif contains "$_asset" "$_target_fallback"; then
+            if contains "$_asset" "$_bin"; then
+                _score=4   # 3. target fallback + bin
+            elif contains "$_asset" "$_name"; then
+                _score=3   # 4. target fallback + name
+            else
+                _score=1   # 6. target fallback
+            fi
+        fi
+
+        if (( _score > _best_score )); then
+            _best="$_asset"
+            _best_score=$_score
         fi
     done
 
-    if [ -n "${_musl_avail:-}" ]; then
-        RETVAL="$_musl_avail"
-        return
+    if [ -n "$_best" ]; then
+        RETVAL="$_best"
     else
         err "target $_target is not available for download"
     fi
@@ -575,7 +604,7 @@ main() {
         ok "detected target: $_target"
     fi
 
-    get_release_asset "$_repo" "$_tag" "$_target"
+    get_release_asset "$_repo" "$_tag" "$_target" "$_bin" "$_name"
     ok "found valid release asset: $RETVAL"
     _filename="$RETVAL"
     _url="https://github.com/$_repo/releases/download/$_tag/$_filename"
